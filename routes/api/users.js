@@ -67,6 +67,7 @@ router.post("/signup", async (req, res, next) => {
   try {
     const newUser = new User({ email });
     newUser.setPassword(password);
+    console.log(newUser.avatarURL);
     await newUser.save();
     res.json({
       status: "success",
@@ -74,6 +75,7 @@ router.post("/signup", async (req, res, next) => {
       data: {
         message: "Signup complete",
         user: `${newUser.email}, ${newUser.subscription}`,
+        avatarURL: newUser.avatarURL,
       },
     });
   } catch (error) {
