@@ -9,6 +9,8 @@ const multer = require("multer");
 const jimp = require("jimp");
 const { nanoid } = require("nanoid");
 
+// test
+
 const uploadDir = path.join(process.cwd(), "tmp");
 const storeAvatar = path.join(process.cwd(), "public/avatars");
 
