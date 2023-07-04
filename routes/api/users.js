@@ -130,10 +130,10 @@ router.patch(
   auth,
   upload.single("avatar"),
   async (req, res, next) => {
-    console.log(req.file);
     const { path: temporaryName, originalname } = req.file;
     const uniqueName = nanoid();
     const fileName = path.join(storeAvatar, uniqueName.concat(originalname));
+    const avatarName = uniqueName.concat(originalname);
     try {
       if (!req.file) {
         return res.status(400).json({ message: "File not found" });
@@ -152,7 +152,7 @@ router.patch(
 
       const user = await User.findById(req.user._id);
 
-      user.avatarURL = `/avatars/${fileName}`;
+      user.avatarURL = `/avatars/${avatarName}`;
       await user.save();
 
       await fs.rename(temporaryName, fileName);
