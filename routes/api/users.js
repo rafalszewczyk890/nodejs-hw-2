@@ -8,11 +8,13 @@ const fs = require("fs").promises;
 const multer = require("multer");
 const jimp = require("jimp");
 const { nanoid } = require("nanoid");
+const sgMail = require("@sendgrid/mail");
 
 const uploadDir = path.join(process.cwd(), "tmp");
 const storeAvatar = path.join(process.cwd(), "public/avatars");
 
 require("dotenv").config();
+
 const SECRET = process.env.SECRET;
 
 const storage = multer.diskStorage({
@@ -108,6 +110,23 @@ router.post("/signup", async (req, res, next) => {
     });
   }
   try {
+    console.log();
+    sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+    const msg = {
+      to: email, // Change to your recipient
+      from: "rafal.szewczyk890@gmail.com", // Change to your verified sender
+      subject: "Email verification",
+      text: "Email verification for GoIT task hw06",
+    };
+    sgMail
+      .send(msg)
+      .then(() => {
+        console.log("Email sent");
+      })
+      .catch((error) => {
+        console.error(error);
+      });
+
     const newUser = new User({ email });
     newUser.setPassword(password);
     await newUser.save();
