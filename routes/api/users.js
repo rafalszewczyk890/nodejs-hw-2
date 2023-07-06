@@ -55,6 +55,14 @@ router.use((req, res, next) => {
 router.post("/login", async (req, res, next) => {
   const { email, password } = req.body;
   const user = await User.findOne({ email });
+  if (user.verify === false) {
+    return res.json({
+      status: "error",
+      code: 400,
+      data: "Bad request",
+      message: "User not verified",
+    });
+  }
   if (!user || !user.validPassword(password)) {
     return res.json({
       status: "error",
@@ -110,14 +118,16 @@ router.post("/signup", async (req, res, next) => {
     });
   }
   try {
-    console.log();
+    const verificationToken = nanoid();
+    console.log(verificationToken);
     sgMail.setApiKey(process.env.SENDGRID_API_KEY);
     const msg = {
       to: email, // Change to your recipient
       from: "rafal.szewczyk890@gmail.com", // Change to your verified sender
       subject: "Email verification",
-      text: "Email verification for GoIT task hw06",
+      text: `Verification link: localhost:3000/api/users/verify/${verificationToken}`,
     };
+
     sgMail
       .send(msg)
       .then(() => {
@@ -127,7 +137,7 @@ router.post("/signup", async (req, res, next) => {
         console.error(error);
       });
 
-    const newUser = new User({ email });
+    const newUser = new User({ email, verificationToken });
     newUser.setPassword(password);
     await newUser.save();
     res.json({
@@ -209,6 +219,37 @@ router.get("/current", auth, async (req, res, next) => {
     email: user.email,
     subscription: user.subscription,
   });
+});
+
+router.get("/verify/:verificationToken", async (req, res, next) => {
+  try {
+    const verificationToken = req.params.verificationToken;
+    const user = await User.findOne({ verificationToken: verificationToken });
+
+    if (!user) {
+      return res.json({
+        status: "Not found",
+        code: 404,
+      });
+    }
+
+    if (user) {
+      user.verify = true;
+      user.verificationToken = "null";
+
+      await user.save();
+
+      return res.json({
+        status: "Verification successful",
+        code: 200,
+      });
+    }
+  } catch (error) {
+    return res.json({
+      error,
+      code: 500,
+    });
+  }
 });
 
 module.exports = router;
