@@ -8,12 +8,15 @@ const fs = require("fs").promises;
 const multer = require("multer");
 const jimp = require("jimp");
 const { nanoid } = require("nanoid");
+const sgMail = require("@sendgrid/mail");
 
 const uploadDir = path.join(process.cwd(), "tmp");
 const storeAvatar = path.join(process.cwd(), "public/avatars");
 
 require("dotenv").config();
+
 const SECRET = process.env.SECRET;
+sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
@@ -53,6 +56,14 @@ router.use((req, res, next) => {
 router.post("/login", async (req, res, next) => {
   const { email, password } = req.body;
   const user = await User.findOne({ email });
+  if (user.verify === false) {
+    return res.json({
+      status: "error",
+      code: 400,
+      data: "Bad request",
+      message: "User not verified",
+    });
+  }
   if (!user || !user.validPassword(password)) {
     return res.json({
       status: "error",
@@ -108,7 +119,25 @@ router.post("/signup", async (req, res, next) => {
     });
   }
   try {
-    const newUser = new User({ email });
+    const verificationToken = nanoid();
+
+    const msg = {
+      to: email, // Change to your recipient
+      from: "rafal.szewczyk890@gmail.com", // Change to your verified sender
+      subject: "Email verification",
+      text: `Verification link: localhost:3000/api/users/verify/${verificationToken}`,
+    };
+
+    sgMail
+      .send(msg)
+      .then(() => {
+        console.log("Email sent");
+      })
+      .catch((error) => {
+        console.error(error);
+      });
+
+    const newUser = new User({ email, verificationToken });
     newUser.setPassword(password);
     await newUser.save();
     res.json({
@@ -190,6 +219,84 @@ router.get("/current", auth, async (req, res, next) => {
     email: user.email,
     subscription: user.subscription,
   });
+});
+
+router.get("/verify/:verificationToken", async (req, res, next) => {
+  try {
+    const verificationToken = req.params.verificationToken;
+    const user = await User.findOne({ verificationToken: verificationToken });
+
+    if (!user) {
+      return res.json({
+        status: "Not found",
+        code: 404,
+      });
+    }
+
+    if (user) {
+      user.verify = true;
+      user.verificationToken = "null";
+
+      await user.save();
+
+      return res.json({
+        status: "Verification successful",
+        code: 200,
+      });
+    }
+  } catch (error) {
+    return res.json({
+      error,
+      code: 500,
+    });
+  }
+});
+
+router.post("/verify", async (req, res, next) => {
+  const email = req.body.email;
+  if (!email) {
+    return res.json({
+      message: "missing required field email",
+      status: 400,
+    });
+  }
+
+  const user = await User.findOne({ email });
+  const verificationToken = user.verificationToken;
+  if (!user) {
+    return res.json({
+      message: "User not found",
+      status: 404,
+    });
+  }
+  if (user.verify === false) {
+    const msg = {
+      to: email, // Change to your recipient
+      from: "rafal.szewczyk890@gmail.com", // Change to your verified sender
+      subject: "Email verification",
+      text: `Verification link: localhost:3000/api/users/verify/${verificationToken}`,
+    };
+
+    sgMail
+      .send(msg)
+      .then(() => {
+        console.log("Email sent");
+        return res.json({
+          message: "Verification email sent",
+          status: 200,
+        });
+      })
+      .catch((error) => {
+        console.error(error);
+      });
+  }
+
+  if (user.verify === true) {
+    return res.json({
+      message: "Verification has already been passed",
+      status: 400,
+    });
+  }
 });
 
 module.exports = router;
